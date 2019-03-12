@@ -1,0 +1,122 @@
+<link href="https://s3.amazonaws.com/mturk-public/bs30/css/bootstrap.min.css" rel="stylesheet" /><script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+<section class="container" id="Other" style="margin-bottom:15px; padding: 10px 10px; font-family: Verdana, Geneva, sans-serif; color:#333333; font-size:0.9em;">
+    <div class="row col-xs-12 col-md-12">
+        <!-- ${hitnum} -->
+        <div class="panel panel-primary">
+            <div class="panel-heading"><strong>Instructions</strong></div>
+
+            <div class="panel-body">
+                <p>This tasks involves some creativity. Please read the instructions carefully. Expect to spend around 3min per HIT</p>
+
+                <ul>
+                    <li>Imagine you are asking for help from a company&#39;s customer service. The company could be anything (retail, insurance, shipping) be <strong>creative</strong>!</li>
+                    <li>You will be creating four queries that may be asked of a customer service agent.</li>
+                    <li><strong>Be creative, mix up the type of responses you give, have fun!</strong></li>
+                </ul>
+                <strong>Example of GOOD responses: (Please read)</strong>
+
+                <ol>
+                    <div>
+
+                        <br>
+                        <p><strong>Responses:</strong></p>
+
+                        <ol>
+                            <li>Please check on my order.</li>
+                            <li>How long will it take for my package to ship?</li>
+                            <li>Can you delay my subscription to start next month instead of this month?</li>
+                            <li>What features does your new line of products offer?</li>
+                        </ol>
+
+                        <p>&nbsp;</p>
+
+                        <p><strong>Why these are GOOD responses: </strong>
+                            <ol>
+                            <li>They are of a <strong>varying format and structure</strong>.</li>
+                            <li>They are creative and each address a <strong>unique</strong> question/task that would be asked of a customer service agent.</li>
+                            </ol>
+                        </p>
+                    </div>
+                </ol>
+                <strong>Example of BAD responses: (Please read)</strong>
+
+                <ol>
+                    <li>
+                        <div>
+
+                            <p><strong>Responses: (REMEMBER THESE ARE BAD!)</strong></p>
+
+                            <ol>
+                                <li>Check on my order.</li>
+                                <li>Please check on my order.</li>
+                                <li>Check on my account.</li>
+                                <li>How are you today?</li>
+                            </ol>
+
+                            <p>&nbsp;</p>
+
+                            <p><strong>Why these are BAD responses: </strong></p>
+
+                            <ul>
+                                <li>(1) - (3) are not bad on their own but are just slight rewordings of each other, all have nearly exactly the same format/meaning, and <strong>show no variety or creativity</strong>. We expect you to provide us with four unique and varying customer service requests.</li>
+                                <li>While (4) is a unique question, it is just small talk and does not represent a task/question that would be asked of a customer service agent.</li>
+                            </ul>
+
+                            <p>&nbsp;</p>
+                        </div>
+                    </li>
+                </ol>
+
+                <p>We try to do our best to pay turkers fairly, giving time to think about the task and submit reasonable responses. Individuals who try and exploit the task by submitting empty, incomplete, or lots of bad responses will NOT have their work approved. Don&#39;t worry about this if you are putting in a normal amount of thought/effort! We appreciate your help and please leave feedback if you have any thoughts or comments!</p>
+            </div>
+        </div>
+
+        <section>
+            <fieldset>&nbsp;</fieldset>
+            <label>Customer Service Request 1</label>
+
+            <fieldset>
+                <div class="input-group"><input class="form-control" name="response_0" placeholder="A UNIQUE and CREATIVE request of a customer service agent." size="120" type="text" /></div>
+            </fieldset>
+
+            <label>Customer Service Request 2</label>
+
+            <fieldset>
+                <div class="input-group"><input class="form-control" name="response_1" placeholder="A UNIQUE and CREATIVE request of a customer service agent." size="120" type="text" /></div>
+            </fieldset>
+
+            <label>Customer Service Request 3</label>
+
+            <fieldset>
+                <div class="input-group"><input class="form-control" name="response_2" placeholder="A UNIQUE and CREATIVE request of a customer service agent." size="120" type="text" /></div>
+            </fieldset>
+
+            <label>Customer Service Request 4</label>
+
+            <fieldset>
+                <div class="input-group"><input class="form-control" name="response_3" placeholder="A UNIQUE and CREATIVE request of a customer service agent." size="120" type="text" /></div>
+            </fieldset>
+        </section>
+        &nbsp;
+
+
+        <section>
+            <fieldset><label>Feedback</label></fieldset>
+
+            <fieldset>
+                <div class="input-group"><input class="form-control" name="feedback" placeholder="" size="120" type="text" /></div>
+            </fieldset>
+        </section>
+    </div>
+</section>
+
+<script type="text/javascript">
+  function stopRKey(evt) {
+    var evt = (evt) ? evt : ((event) ? event : null);
+    var node = (evt.target) ? evt.target : ((evt.srcElement) ? evt.srcElement : null);
+    if ((evt.keyCode == 13) && (node.type=="text")) {return false;}
+  }
+
+  document.onkeypress = stopRKey;
+
+</script>

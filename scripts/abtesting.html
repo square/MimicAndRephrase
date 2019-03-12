@@ -1,0 +1,104 @@
+<!-- Bootstrap v3.0.3 -->
+<link href="https://s3.amazonaws.com/mturk-public/bs30/css/bootstrap.min.css" rel="stylesheet" />
+<section class="container" id="Other" style="margin-bottom:15px; padding: 10px 10px; font-family: Verdana, Geneva, sans-serif; color:#333333; font-size:0.9em;">
+  <div class="row col-xs-12 col-md-12"><!-- Instructions -->
+    <div class="panel panel-primary">
+      <div class="panel-heading"><strong>Instructions</strong></div>
+
+      <div class="panel-body">
+        <p>This tasks involves some creativity. Please read the instructions carefully.
+          <strong>It is important to read all instructions to be able to produce a response that will not be rejected.</strong>
+          Expect to spend around 1.5 min per HIT</p>
+
+        <ul>
+          <li>Imagine you are interacting with a customer service agent for a company.</li>
+          <li>You will be tasked with choosing which of two responses is most appropriate for a given question asked of the customer service agent.</li>
+          <li>You should pick the response that seems most <strong>fluent</strong> and <strong>appropriate</strong> in response.</li>
+          <li>Most responses will <strong>not</strong> be helpful to the customer but are still appropriate and fluent sounding and are the right choice to pick.</li>
+          <li>Ignore the fact that all responses have incorrect capitalization.</li>
+        </ul>
+        <strong>Example of what to pick: (Please read)</strong>
+
+        <ol>
+
+          <div>
+
+
+            <ol>
+              <li><strong>Original Question: </strong>What time does the bank open today? <br/>
+
+                <strong>Response 1: </strong> i do not know what time the bank opens today. <br/>
+                <strong>Response 2: </strong> i am not able to give you the time bank open today. <br/>
+                <strong>Response 1 is correct </strong> in this scenario as both responses are equally unhelpful, response 1 uses proper English and is an appropriate response from a customer service representative.
+              </li>
+
+              <li><strong>Original Question: </strong>If I win my case, what am I entitled to?<br/>
+                <strong>Response 1: </strong> i do not know if you win your case, what you are entitled to.<br/>
+                <strong>Response 2: </strong> i do not know what you are entitled to. <br/>
+                <strong>Response 2 is correct.</strong> While both responses are proper in grammar and English, response 2 feels less wordy and more of a fluent response.
+              </li>
+
+              <li><strong>Original Question: </strong>Help me file my taxes.<br/>
+                <strong>Response 1: </strong> i am not able to help you file your taxes.<br/>
+                <strong>Response 2: </strong> i do not know about taxes.<br/>
+                <strong>Response 1 is correct.</strong> While both responses are fluent, response 1 most directly answers the customers question.
+              </li>
+            </ol>
+
+          </div>
+
+        </ol>
+
+        <p>We try to do our best to pay turkers fairly, giving time to think about the task and submit reasonable responses. Individuals who try and exploit the task by submitting empty, incomplete, or lots of bad responses will NOT have their work approved. Don&#39;t worry about this if you are putting in a normal amount of thought/effort! We appreciate your help and please leave feedback if you have any thoughts or comments!</p>
+      </div>
+    </div>
+    <!-- End Instructions --><!-- Content Body -->
+
+    <section>
+      <fieldset><label>Choose the most appropriate response to: "${Q1}"<br/>
+      </label>
+
+        <div class="radio"><label><input name="Q1Answer" type="radio" value="A" />${Q1A}</label></div>
+
+        <div class="radio"><label><input name="Q1Answer" type="radio" value="B" />${Q1B}</label></div>
+      </fieldset>
+      <fieldset><label>Choose the most appropriate response to: "${Q2}"<br/>
+      </label>
+
+        <div class="radio"><label><input name="Q2Answer" type="radio" value="A" />${Q2A}</label></div>
+
+        <div class="radio"><label><input name="Q2Answer" type="radio" value="B" />${Q2B}</label></div>
+      </fieldset>
+      <fieldset><label>Choose the most appropriate response to: "${Q3}"<br/>
+      </label>
+
+        <div class="radio"><label><input name="Q3Answer" type="radio" value="A" />${Q3A}</label></div>
+
+        <div class="radio"><label><input name="Q3Answer" type="radio" value="B" />${Q3B}</label></div>
+      </fieldset>
+      <fieldset><label>Choose the most appropriate response to: "${Q4}"<br/>
+      </label>
+
+        <div class="radio"><label><input name="Q4Answer" type="radio" value="A" />${Q4A}</label></div>
+
+        <div class="radio"><label><input name="Q4Answer" type="radio" value="B" />${Q4B}</label></div>
+      </fieldset>
+      <fieldset><label>Choose the most appropriate response to: "${Q5}"<br/>
+      </label>
+
+        <div class="radio"><label><input name="Q5Answer" type="radio" value="A" />${Q5A}</label></div>
+
+        <div class="radio"><label><input name="Q5Answer" type="radio" value="B" />${Q5B}</label></div>
+      </fieldset>
+
+    </section>
+    <!-- End Content Body --></div>
+</section>
+<!-- close container -->
+<style type="text/css">fieldset {
+  padding: 10px;
+  background:#fbfbfb;
+  border-radius:5px;
+  margin-bottom:5px;
+}
+</style>
