@@ -1,0 +1,57 @@
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
+    <!-- width=device-width, -->
+    <meta name="viewport" content="initial-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <!-- color on mobile browsers -->
+    <meta name="theme-color" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <title>Eloquent Labs</title>
+  </head>
+  <body>
+    <noscript>
+      Please enable JavaScript to proceed.
+    </noscript>
+
+    <!-- path to the submit is set from the url -->
+    <form id='mturkForm' name='mturkForm' method="post" action="">
+      <input type='hidden' value='' name='assignmentId' id='assignmentId'/>
+      <!-- Input / Output is written to externally -->
+      <input type="hidden" id="_input" value="{{input}}" />
+      <input type="hidden" id="_output" value="{{output}}" />
+      <div id="root"></div>
+    </form>
+
+    <!-- This submit button is needed by mturk, but we hide and disable
+      it. -->
+    <div style='display: none'>
+      <input type="submit" id="submitButton" class="btn btn-primary" value="Submit" disabled>
+    </div>
+
+<script type="text/javascript">
+function setupSubmit() {
+  // From http://james.padolsey.com/javascript/bujs-1-getparameterbyname/
+  function getUrlParam(name) {
+    let match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : null;
+  }
+
+  try {
+    let submitTo = getUrlParam('turkSubmitTo');
+    if (submitTo) {
+      document.getElementById('mturkForm').setAttribute("action", submitTo + '/mturk/externalSubmit');
+    }
+    document.getElementById('assignmentId').value = getUrlParam('assignmentId');
+  } catch (err) {
+    console.error(err);
+  }
+}
+setupSubmit();
+</script>
+
+  <script type="text/javascript" src="{{SERVER_URL}}/bundle.js" async></script></body>
+</html>
+
