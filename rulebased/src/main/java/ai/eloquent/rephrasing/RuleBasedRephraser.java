@@ -17,9 +17,12 @@ import java.util.stream.Collectors;
  * @author <a href="mailto:angel@eloquent.ai">*Angel Chang</a>
  */
 public class RuleBasedRephraser {
+    // Patterns of first person pronouns and second person replacements
     private static String[] firstPerson = {"i", "me", "my", "mine", "myself", "we", "us", "our", "ours"};
     private static String[] firstPersonReplace = {"you", "you", "your", "yours", "yourself", "you", "you", "your", "yours"};
 
+    // Patterns of second person pronouns and first person replacements
+    // (you is not included since we need to use the dependency graph to determine if it should be me or I)
     private static String[] secondPerson = {"your", "yours", "yourself"};
     private static String[] secondPersonReplace = {"my", "mine", "myself"};
 
@@ -74,6 +77,9 @@ public class RuleBasedRephraser {
 
                 if (dependencies.isPresent() && dependencies.get().equalsIgnoreCase("nsubj")) {
                     workingSentence = replaceWord(workingSentence, i, "I");
+                    if (replaceNextVerb && i+1 < sentenceLength) {
+                        workingSentence = matchAndReplaceWord(workingSentence, i+1, secondPersonVerb, firstPersonVerb);
+                    }
                 } else {
                     workingSentence = replaceWord(workingSentence, i, "me");
                 }

@@ -7,6 +7,7 @@ import edu.stanford.nlp.semgraph.semgrex.SemgrexMatcher;
 import edu.stanford.nlp.semgraph.semgrex.SemgrexPattern;
 import edu.stanford.nlp.simple.Sentence;
 import edu.stanford.nlp.trees.GrammaticalRelation;
+import edu.stanford.nlp.util.Pair;
 
 import java.util.*;
 
@@ -14,8 +15,22 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
   public Optional<String> rephrased(Sentence request) {
     //Preprocess the sentence by switching the point of view of pronouns i.e. I to you
-    return getQuestion(request).map(x -> String.join(" ", x.originalTexts()));
+    Optional<Pair<String,Sentence>> rephrasedPair = rephraseQuestion(request);
+    if (rephrasedPair.isPresent()) {
+      //Get initial phrase
+      String start = rephrasedPair.get().first;
 
+      //Make sure not upper cased
+      Sentence rephrased = rephrasedPair
+              .map(x -> removeQuestionMark(x.second))
+              .map(x -> adjustCapitalization(x))
+              .map(x -> replacePronouns(x)).get();
+
+      //Let's ignore the condensed flag
+      return Optional.of(start + " " + rephrased);
+    } else {
+      return Optional.empty();
+    }
   }
 
   private Sentence removeQuestionMark(Sentence sentence) {
@@ -29,7 +44,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
   }
 
 
-  private Optional<Sentence> getQuestion(Sentence sentence) {
+  private Optional<Pair<String,Sentence>> rephraseQuestion(Sentence sentence) {
     //Get graph for semgrex searches
     SemanticGraph dependencyGraph = sentence.dependencyGraph();
 
@@ -37,8 +52,9 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     SemgrexPattern subjPattern = SemgrexPattern.compile("{} >nsubj {}");
     SemgrexPattern wPattern = SemgrexPattern.compile("{pos:/W.*/}");
     SemgrexPattern qPuncPattern = SemgrexPattern.compile("{word:/\\?/}");
+    // Handles sentences like "Help me"
     if (!subjPattern.matcher(dependencyGraph).find() && !wPattern.matcher(dependencyGraph).find() && !qPuncPattern.matcher(dependencyGraph).find()) {
-      return Optional.of(replacePronouns(new Sentence("I do not know how to " + sentence.text())));
+      return Optional.of(Pair.makePair("I do not know how to", sentence));
     }
 
     //Check for easy question to switch around the phrasing
@@ -113,7 +129,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
       if (qMatcher.find()) {
         copyDepGraph.removeVertex(qMatcher.getMatch());
       }
-      ArrayList<String> words = new ArrayList<>(new Sentence("I do not know").words());
+      ArrayList<String> words = new ArrayList<>();
       for (IndexedWord wWord : wWords) {
         words.add(wWord.word());
       }
@@ -125,25 +141,19 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
       for (IndexedWord remainingWord : remainingWords) {
         words.add(remainingWord.word());
       }
-      return Optional.of(replacePronouns(new Sentence(words)));
+      return Optional.of(Pair.makePair("I do not know", new Sentence(words)));
     }
 
     //If the W POS word is the subject it seems safe to not alter the order of the words.
     SemgrexPattern whoSubjPattern = SemgrexPattern.compile("{} >nsubj {pos:/W.*/}");
     SemgrexMatcher whoSubjMatcher = whoSubjPattern.matcher(dependencyGraph);
     if (whoSubjMatcher.find()) {
-      return Optional.of(replacePronouns(removeQuestionMark(new Sentence("I do not know " + sentence.text()))));
+      return Optional.of(Pair.makePair("I do not know", sentence));
     }
 
     //If it is a "Do ..." or "Does ..." question then output "I do not know if ..."
     if (sentence.lemma(0).toLowerCase().equals("do") && sentence.length() > 1) {
-      List<String> newTokens = new ArrayList<>(Arrays.asList("I", "do", "not", "know", "if"));
-      newTokens.addAll(sentence.originalTexts().subList(1, sentence.length()));
-      return Optional.of(replacePronouns(
-          removeQuestionMark(
-              new Sentence(newTokens)
-          )
-      ));
+      return Optional.of(Pair.makePair("I do not know if", sentence));
     }
 
     //If it is a "Is <word>" or "Are <word>" question then flip "if <word> is/are ..."
@@ -156,9 +166,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
       String firstToken = tokens.get(0);
       rearranged.set(0, tokens.get(1));
       rearranged.set(1, firstToken);
-      List<String> newTokens = new ArrayList<>(Arrays.asList("I", "do", "not", "know", "if"));
-      newTokens.addAll(rearranged);
-      return Optional.of(replacePronouns(removeQuestionMark(new Sentence(newTokens))));
+      return Optional.of(Pair.makePair("I do not know if", new Sentence(rearranged)));
     }
 
     //Worst Case Scenario
@@ -167,7 +175,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
   protected Sentence replacePronouns(Sentence sentence) {
     //Start at 1 to ignore first I statement in rephrasing
-    return replacePronouns(sentence, 1, false);
+    return replacePronouns(sentence, 0, true);
   }
 
 }
