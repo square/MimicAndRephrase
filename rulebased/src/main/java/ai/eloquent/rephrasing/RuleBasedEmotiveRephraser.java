@@ -11,23 +11,23 @@ import java.util.*;
  */
 public class RuleBasedEmotiveRephraser extends RuleBasedRephraser {
 
-    public enum Emotive { Positive, Negative }
-    static final Map<Emotive, List<String>> EmotivePhrases = new HashMap<>();
+    public enum Sentiment { Positive, Negative }
+    static final Map<Sentiment, List<String>> EmotivePhrases = new HashMap<>();
     static final List<String> endPhrases = Arrays.asList(
             "that happened",
             "about that"
     );
 
-    public static Map<Emotive, List<String>> getEmotivePhrases() {
+    public static Map<Sentiment, List<String>> getEmotivePhrases() {
         if (EmotivePhrases.size() == 0) {
-            EmotivePhrases.put(Emotive.Positive, Arrays.asList(
+            EmotivePhrases.put(Sentiment.Positive, Arrays.asList(
                     "Good to hear",
                     "I am glad",
                     "I am happy",
                     "I'm glad",
                     "I'm happy"
             ));
-            EmotivePhrases.put(Emotive.Negative, Arrays.asList(
+            EmotivePhrases.put(Sentiment.Negative, Arrays.asList(
                     "I am sorry",
                     "Sorry to hear",
                     "Sorry",
@@ -44,8 +44,8 @@ public class RuleBasedEmotiveRephraser extends RuleBasedRephraser {
         random.setSeed(seed);
     }
 
-    public String getStartPhrase(Emotive Emotive) {
-        List<String> startPhrases = getEmotivePhrases().get(Emotive);
+    public String getStartPhrase(Sentiment sentiment) {
+        List<String> startPhrases = getEmotivePhrases().get(sentiment);
         int i = random.nextInt(startPhrases.size());
         return startPhrases.get(i);
     }
@@ -55,9 +55,9 @@ public class RuleBasedEmotiveRephraser extends RuleBasedRephraser {
         return endPhrases.get(i);
     }
 
-    public Optional<String> rephrased(Sentence sentence, Emotive Emotive, boolean condensed) {
-        //Get initial phrase based on Emotive
-        String start = getStartPhrase(Emotive);
+    public Optional<String> rephrased(Sentence sentence, Sentiment sentiment, boolean condensed) {
+        //Get initial phrase based on sentiment
+        String start = getStartPhrase(sentiment);
 
         //Preprocess the sentence by switching the point of view of pronouns i.e. I to you
         Sentence rephrased = replacePronouns(sentence);
@@ -74,9 +74,9 @@ public class RuleBasedEmotiveRephraser extends RuleBasedRephraser {
         return Optional.of(start + " " + rephrased);
     }
 
-    public String rephrasedGeneric(Emotive Emotive) {
-        //Get initial phrase based on Emotive
-        String start = getStartPhrase(Emotive);
+    public String rephrasedGeneric(Sentiment sentiment) {
+        //Get initial phrase based on sentiment
+        String start = getStartPhrase(sentiment);
         String end = getEndPhrase();
         return start + " " + end;
     }

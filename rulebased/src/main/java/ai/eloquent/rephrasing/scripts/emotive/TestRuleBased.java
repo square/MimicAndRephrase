@@ -1,4 +1,4 @@
-package ai.eloquent.scripts.rephrasing.emotive;
+package ai.eloquent.rephrasing.scripts.emotive;
 
 import ai.eloquent.rephrasing.RuleBasedEmotiveRephraser;
 import au.com.bytecode.opencsv.CSVReader;

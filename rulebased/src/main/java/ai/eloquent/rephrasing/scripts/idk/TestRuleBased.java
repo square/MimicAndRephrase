@@ -45,7 +45,7 @@ public class TestRuleBased {
   public static void main(String[] args) throws IOException {
     ArgumentParser.fillOptions(TestRuleBased.class, args);
     List<Sentence> sentences = readSentences();
-    IDKRephraser rephraser = new RuleBasedIDKRephraser();
+    RuleBasedIDKRephraser rephraser = new RuleBasedIDKRephraser();
     if (outFile == null) {
       for (Sentence sentence : sentences) {
         Optional<String> rephrased = rephraser.rephrased(sentence);

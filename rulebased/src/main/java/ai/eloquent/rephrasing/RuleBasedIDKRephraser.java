@@ -12,7 +12,6 @@ import java.util.*;
 
 public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
-  @Override
   public Optional<String> rephrased(Sentence request) {
     //Preprocess the sentence by switching the point of view of pronouns i.e. I to you
     return getQuestion(request).map(x -> String.join(" ", x.originalTexts()));

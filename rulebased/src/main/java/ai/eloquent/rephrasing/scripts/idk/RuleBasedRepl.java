@@ -21,7 +21,7 @@ public class RuleBasedRepl {
         // Test a sentence.
         Scanner in = new Scanner(System.in);
         System.out.println("Enter a request");
-        IDKRephraser rephraser = new RuleBasedIDKRephraser();
+        RuleBasedIDKRephraser rephraser = new RuleBasedIDKRephraser();
         while (true) {
             System.out.print("> ");
             String prompt;
