@@ -15,6 +15,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
   public Optional<String> rephrased(Sentence request) {
     //Preprocess the sentence by switching the point of view of pronouns i.e. I to you
+    request = simplify(request);
     Optional<Pair<String,Sentence>> rephrasedPair = rephraseQuestion(request);
     if (rephrasedPair.isPresent()) {
       //Get initial phrase
@@ -43,6 +44,30 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     return new Sentence(depGraph.toRecoveredSentenceString());
   }
 
+
+  private Sentence simplify(Sentence sentence) {
+    List<String> words = sentence.words();
+    if (words.size() > 0 && words.get(0).equalsIgnoreCase("please")) {
+      // Drop please
+      sentence = new Sentence(words.subList(1, words.size()));
+    }
+    //sentence = shortenUsingConstituencyParseWithQuestion(sentence);
+    sentence = removeAuxilliary(sentence);
+    return sentence;
+  }
+
+  private Sentence removeAuxilliary(Sentence sentence) {
+    SemanticGraph dependencyGraph = sentence.dependencyGraph();
+    // Simplify sentences like "Why do you sell socks?" to "You sell socks"
+    // Simplify sentences like "Do you sell socks?" to "You sell socks?"
+    SemgrexPattern auxPattern = SemgrexPattern.compile("{pos:/V.*/}=v1 >aux {pos:/V.*/}=v2");
+    SemgrexMatcher auxPatternMatcher = auxPattern.matcher(dependencyGraph);
+    if (auxPatternMatcher.find()) {
+      dependencyGraph.removeVertex(auxPatternMatcher.getNode("v2"));
+      sentence = new Sentence(dependencyGraph.toRecoveredSentenceString());
+    }
+    return sentence;
+  }
 
   private Optional<Pair<String,Sentence>> rephraseQuestion(Sentence sentence) {
     //Get graph for semgrex searches
@@ -152,24 +177,24 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     }
 
     //If it is a "Do ..." or "Does ..." question then output "I do not know if ..."
-    if (sentence.lemma(0).toLowerCase().equals("do") && sentence.length() > 1) {
+    if (sentence.lemma(0).equalsIgnoreCase("do") && sentence.length() > 1) {
       return Optional.of(Pair.makePair("I do not know if", sentence));
     }
 
     //If it is a "Is <word>" or "Are <word>" question then flip "if <word> is/are ..."
-    //If it is a "Can <word>" or "May <word>" question do the same
-    if ((sentence.lemma(0).toLowerCase().equals("be") ||
-        sentence.lemma(0).toLowerCase().equals("can") ||
-        sentence.lemma(0).toLowerCase().equals("may")) && sentence.length() > 1) {
+    //If it is a "Can|Could|Would|May|Will <word>" question do the same
+    if ((sentence.lemma(0).equalsIgnoreCase("be") ||
+//        sentence.lemma(0).equalsIgnoreCase("can") ||
+//        sentence.lemma(0).equalsIgnoreCase("may")) && sentence.length() > 1) {
+         sentence.posTag(0).equals("MD")) && sentence.length() > 1 ) {
       List<String> tokens = sentence.originalTexts();
       List<String> rearranged = new ArrayList<>(tokens);
-      String firstToken = tokens.get(0);
       rearranged.set(0, tokens.get(1));
-      rearranged.set(1, firstToken);
+      rearranged.set(1, tokens.get(0).toLowerCase());
       return Optional.of(Pair.makePair("I do not know if", new Sentence(rearranged)));
     }
 
-    //Worst Case Scenario
+    // Worst Case Scenario
     return Optional.empty();
   }
 
