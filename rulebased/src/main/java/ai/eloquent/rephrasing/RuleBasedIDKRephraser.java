@@ -14,23 +14,41 @@ import java.util.*;
 public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
   public Optional<String> rephrased(Sentence request) {
+    Optional<Rephrased> rephrased = rephrasedWithRule(request);
+    return rephrased.map(x -> x.toString());
+  }
+
+  public Optional<Rephrased> rephrasedWithRule(Sentence request) {
     //Preprocess the sentence by switching the point of view of pronouns i.e. I to you
     request = simplify(request);
-    Optional<Pair<String,Sentence>> rephrasedPair = rephraseQuestion(request);
-    if (rephrasedPair.isPresent()) {
-      //Get initial phrase
-      String start = rephrasedPair.get().first;
-
+    Optional<Rephrased> rephrased = rephraseQuestion(request);
+    if (rephrased.isPresent()) {
       //Make sure not upper cased
-      Sentence rephrased = rephrasedPair
-              .map(x -> removeQuestionMark(x.second))
+      rephrased.get().sentence = rephrased
+              .map(x -> removeQuestionMark(x.sentence))
               .map(x -> adjustCapitalization(x))
               .map(x -> replacePronouns(x)).get();
 
       //Let's ignore the condensed flag
-      return Optional.of(start + " " + rephrased);
+      return rephrased;
     } else {
       return Optional.empty();
+    }
+  }
+
+  public static class Rephrased {
+    public Sentence sentence;  // Rephrased sentence
+    public String prefix;      // IDK prefix to apply
+    public String rule;        // Rule that was applied
+
+    public Rephrased(String prefix, Sentence sentence, String rule) {
+      this.sentence = sentence;
+      this.prefix = prefix;
+      this.rule = rule;
+    }
+
+    public String toString() {
+      return prefix + " " + sentence;
     }
   }
 
@@ -69,7 +87,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     return sentence;
   }
 
-  private Optional<Pair<String,Sentence>> rephraseQuestion(Sentence sentence) {
+  private Optional<Rephrased> rephraseQuestion(Sentence sentence) {
     //Get graph for semgrex searches
     SemanticGraph dependencyGraph = sentence.dependencyGraph();
 
@@ -79,7 +97,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     SemgrexPattern qPuncPattern = SemgrexPattern.compile("{word:/\\?/}");
     // Handles sentences like "Help me"
     if (!subjPattern.matcher(dependencyGraph).find() && !wPattern.matcher(dependencyGraph).find() && !qPuncPattern.matcher(dependencyGraph).find()) {
-      return Optional.of(Pair.makePair("I do not know how to", sentence));
+      return Optional.of(new Rephrased("I do not know how to", sentence, "IMPERATIVE"));
     }
 
     //Check for easy question to switch around the phrasing
@@ -166,19 +184,19 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
       for (IndexedWord remainingWord : remainingWords) {
         words.add(remainingWord.word());
       }
-      return Optional.of(Pair.makePair("I do not know", new Sentence(words)));
+      return Optional.of(new Rephrased("I do not know", new Sentence(words), "WQUES"));
     }
 
     //If the W POS word is the subject it seems safe to not alter the order of the words.
     SemgrexPattern whoSubjPattern = SemgrexPattern.compile("{} >nsubj {pos:/W.*/}");
     SemgrexMatcher whoSubjMatcher = whoSubjPattern.matcher(dependencyGraph);
     if (whoSubjMatcher.find()) {
-      return Optional.of(Pair.makePair("I do not know", sentence));
+      return Optional.of(new Rephrased("I do not know", sentence, "WSUBJ"));
     }
 
     //If it is a "Do ..." or "Does ..." question then output "I do not know if ..."
     if (sentence.lemma(0).equalsIgnoreCase("do") && sentence.length() > 1) {
-      return Optional.of(Pair.makePair("I do not know if", sentence));
+      return Optional.of(new Rephrased("I do not know if", sentence, "DO_QUESTION"));
     }
 
     //If it is a "Is <word>" or "Are <word>" question then flip "if <word> is/are ..."
@@ -191,7 +209,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
       List<String> rearranged = new ArrayList<>(tokens);
       rearranged.set(0, tokens.get(1));
       rearranged.set(1, tokens.get(0).toLowerCase());
-      return Optional.of(Pair.makePair("I do not know if", new Sentence(rearranged)));
+      return Optional.of(new Rephrased("I do not know if", new Sentence(rearranged), "MD_QUESTION"));
     }
 
     // Worst Case Scenario

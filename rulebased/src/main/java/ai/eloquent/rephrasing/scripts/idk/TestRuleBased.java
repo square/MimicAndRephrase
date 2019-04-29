@@ -59,14 +59,17 @@ public class TestRuleBased {
           if (count % 100 == 0) {
             System.out.println("" + count + "/" + sentences.size());
           }
-          Optional<String> rephrased = rephraser.rephrased(sentence);
-          String toAdd;
+          Optional<RuleBasedIDKRephraser.Rephrased> rephrased = rephraser.rephrasedWithRule(sentence);
+          String text;
+          String rule;
           if (rephrased.isPresent()) {
-            toAdd = rephrased.get();
+            text = rephrased.get().toString();
+            rule = rephrased.get().rule;
           } else {
-            toAdd = "CANONICAL_IDK";
+            text = "I do not know how to handle '" + sentence.text() + "'";
+            rule = "CANONICAL_IDK";
           }
-          String[] row = {sentence.text(), toAdd};
+          String[] row = {rule, sentence.text(), text};
           writer.writeNext(row);
           count += 1;
         }

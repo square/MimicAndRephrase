@@ -1,11 +1,9 @@
 package ai.eloquent.rephrasing;
 
-import edu.stanford.nlp.ling.IndexedWord;
-import edu.stanford.nlp.ling.Word;
+import edu.stanford.nlp.ling.LabeledWord;
 import edu.stanford.nlp.simple.Sentence;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.util.ArraySet;
-import edu.stanford.nlp.util.IntPair;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -126,14 +124,43 @@ public class RuleBasedRephraser {
         Set<String> slabels = new ArraySet<>();
         slabels.add("ROOT");
         slabels.add("S");
+        Sentence s = shortenUsingConstituencyParse(sentence, slabels);
+        return s != null? s : sentence;
+    }
+
+    protected Sentence shortenUsingConstituencyParseWithQuestion(Sentence sentence) {
+        Set<String> slabels = new ArraySet<>();
+        slabels.add("SQ");
+        Sentence sq = shortenUsingConstituencyParse(sentence, slabels);
+        if (sq != null) return sq;
+
+        slabels.add("ROOT");
+        slabels.add("S");
+        Sentence s = shortenUsingConstituencyParse(sentence, slabels);
+        return s != null? s : sentence;
+    }
+
+    protected static Set<String> PUNCT_POS = new ArraySet<String>(".", ",", ":");
+    protected Sentence shortenUsingConstituencyParse(Sentence sentence, Set<String> slabels) {
         Tree t = sentence.parse();
         Tree sc = dfs(t, x -> !slabels.contains(x.value()), x -> true);
         if (sc != null) {
             Tree p = sc.parent(t);
-            List<Word> words = p.yieldWords();
+            if (p == null) { p = sc; }
+            List<LabeledWord> words = p.labeledYield();
+            int startIndex = 0;
+            int endIndex = words.size() - 1;
+            while (PUNCT_POS.contains(words.get(startIndex)) && startIndex < endIndex) {
+                startIndex++;
+            }
+            while (PUNCT_POS.contains(words.get(endIndex)) && startIndex < endIndex) {
+                endIndex--;
+            }
+            words = words.subList(startIndex, endIndex);
+            System.out.println(words);
             return new Sentence(words.stream().map( x -> x.word()).collect(Collectors.toList()));
         }
-        return sentence;
+        return null;
     }
 
     protected Sentence shorten(Sentence sentence) {
