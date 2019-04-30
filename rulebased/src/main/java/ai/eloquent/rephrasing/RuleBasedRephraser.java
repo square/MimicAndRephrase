@@ -1,9 +1,15 @@
 package ai.eloquent.rephrasing;
 
 import edu.stanford.nlp.ling.LabeledWord;
+import edu.stanford.nlp.pipeline.AnnotationPipeline;
+import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.simple.Sentence;
 import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.trees.tregex.TregexMatcher;
+import edu.stanford.nlp.trees.tregex.TregexPattern;
 import edu.stanford.nlp.util.ArraySet;
+import edu.stanford.nlp.util.Lazy;
+import edu.stanford.nlp.util.PropertiesUtils;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -26,6 +32,28 @@ public class RuleBasedRephraser {
 
     private static String[] firstPersonVerb = {"am", "'m", "was"};
     private static String[] secondPersonVerb = {"are", "are", "were"};
+
+    public static final Lazy<? extends AnnotationPipeline> TOKENIZE_PTB_SSPLIT = Lazy.of(() -> {
+        Properties props = PropertiesUtils.asProperties(
+                "language", "english",
+                "annotators", "tokenize,ssplit",
+                "tokenize.class", "PTBTokenizer",
+                "tokenize.language", "en",
+                "tokenize.options", "splitHyphenated=true,invertible,ptb3Escaping=true",
+                "ssplit.newlineIsSentenceBreak", "two"
+        );
+        return new StanfordCoreNLP(props);
+    });
+
+    public static final Lazy<? extends AnnotationPipeline> TOKENIZE_WS_SSPLIT = Lazy.of(() -> {
+        Properties props = PropertiesUtils.asProperties(
+                "language", "english",
+                "annotators", "tokenize,ssplit",
+                "tokenize.language", "Whitespace",
+                "ssplit.newlineIsSentenceBreak", "two"
+        );
+        return new StanfordCoreNLP(props);
+    });
 
     protected Sentence replaceWord(Sentence sentence, int index, String newWord) {
         ArrayList<String> newWords = new ArrayList<>(sentence.words());
@@ -120,20 +148,32 @@ public class RuleBasedRephraser {
         return null;
     }
 
-    protected Sentence shortenUsingConstituencyParse(Sentence sentence) {
-        Set<String> slabels = new ArraySet<>();
-        slabels.add("ROOT");
-        slabels.add("S");
-        Sentence s = shortenUsingConstituencyParse(sentence, slabels);
-        return s != null? s : sentence;
+    protected Sentence shortenUsingConstituencyParseWithQuestion(Sentence sentence) {
+        Sentence s = shortenUsingConstituencyParseWithTregex(sentence, "SQ | SBARQ");
+        if (s == null) {
+            s = shortenUsingConstituencyParseWithTregex(sentence, "S | SBAR");
+        }
+        return (s != null)? s : sentence;
     }
 
-    protected Sentence shortenUsingConstituencyParseWithQuestion(Sentence sentence) {
-        Set<String> slabels = new ArraySet<>();
-        slabels.add("SQ");
-        Sentence sq = shortenUsingConstituencyParse(sentence, slabels);
-        if (sq != null) return sq;
+    protected Sentence shortenUsingConstituencyParseWithTregex(Sentence sentence, String tregexPattern) {
+        Tree tree = sentence.parse();
+        TregexPattern patternSQ = TregexPattern.compile(tregexPattern);
+        // Run the pattern on one particular tree
+        TregexMatcher matcher = patternSQ.matcher(tree);
+// Iterate over all of the subtrees that matched
+        while (matcher.findNextMatchingNode()) {
+            List<String> words = matcher.getMatch().labeledYield().stream().map(w -> w.word()).collect(Collectors.toList());
+            //System.out.println(words);
+            if (words.size() > 0) {
+                return new Sentence(words);
+            }
+        }
+        return null;
+    }
 
+    protected Sentence shortenUsingConstituencyParse(Sentence sentence) {
+        Set<String> slabels = new ArraySet<>();
         slabels.add("ROOT");
         slabels.add("S");
         Sentence s = shortenUsingConstituencyParse(sentence, slabels);
@@ -146,7 +186,6 @@ public class RuleBasedRephraser {
         Tree sc = dfs(t, x -> !slabels.contains(x.value()), x -> true);
         if (sc != null) {
             Tree p = sc.parent(t);
-            if (p == null) { p = sc; }
             List<LabeledWord> words = p.labeledYield();
             int startIndex = 0;
             int endIndex = words.size() - 1;
@@ -165,6 +204,28 @@ public class RuleBasedRephraser {
 
     protected Sentence shorten(Sentence sentence) {
         return shortenUsingConstituencyParse(sentence);
+    }
+
+    protected List<Sentence> getClauses(Sentence sentence) {
+        List<Sentence> clauses = new ArrayList<>();
+        List<String> words = sentence.words();
+        List<String> posTags = sentence.posTags();
+        int start = 0;
+        int end = -1;
+        for (int i = 0; i < posTags.size(); i++) {
+            if (PUNCT_POS.contains(posTags.get(i))) {
+                if (end > start) {
+                    clauses.add(new Sentence(words.subList(start, end)));
+                }
+                start = i + 1;
+            } else {
+                end = i;
+            }
+        }
+        if (start < posTags.size()) {
+            clauses.add(new Sentence(words.subList(start, posTags.size())));
+        }
+        return clauses;
     }
 
 }

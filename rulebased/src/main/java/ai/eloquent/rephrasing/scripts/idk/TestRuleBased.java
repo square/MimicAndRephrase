@@ -4,10 +4,15 @@ import ai.eloquent.rephrasing.RuleBasedIDKRephraser;
 import au.com.bytecode.opencsv.CSVReader;
 import au.com.bytecode.opencsv.CSVWriter;
 import edu.stanford.nlp.simple.Sentence;
+import edu.stanford.nlp.stats.IntCounter;
 import edu.stanford.nlp.util.ArgumentParser;
 
 import java.io.*;
+import java.text.DateFormat;
+import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,14 +27,14 @@ public class TestRuleBased {
   public static File outFile;
 
 
-  private static List<Sentence> readSentences() {
-    List<Sentence> sentences = new ArrayList<>();
+  private static List<String> readSentences() {
+    List<String> sentences = new ArrayList<>();
 
     try (CSVReader reader = new CSVReader(new FileReader(tsvFile), '\t')) {
       List<String[]> rows = reader.readAll();
       for (String[] row : rows) {
         if (row.length > 0) {
-          sentences.add(new Sentence(row[0]));
+          sentences.add(row[0]);
         }
       }
 
@@ -41,13 +46,14 @@ public class TestRuleBased {
   }
 
 
-
   public static void main(String[] args) throws IOException {
+    DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+    System.out.println(dateFormat.format(new Date()));
     ArgumentParser.fillOptions(TestRuleBased.class, args);
-    List<Sentence> sentences = readSentences();
+    List<String> sentences = readSentences();
     RuleBasedIDKRephraser rephraser = new RuleBasedIDKRephraser();
     if (outFile == null) {
-      for (Sentence sentence : sentences) {
+      for (String sentence : sentences) {
         Optional<String> rephrased = rephraser.rephrased(sentence);
         System.out.println("\n");
         System.out.println(rephrased);
@@ -55,7 +61,9 @@ public class TestRuleBased {
     } else {
       try (CSVWriter writer = new CSVWriter(new FileWriter(outFile), '\t')) {
         int count = 0;
-        for (Sentence sentence : sentences) {
+        int unhandled = 0;
+        IntCounter<String> ruleCounter = new IntCounter<>();
+        for (String sentence : sentences) {
           if (count % 100 == 0) {
             System.out.println("" + count + "/" + sentences.size());
           }
@@ -66,14 +74,19 @@ public class TestRuleBased {
             text = rephrased.get().toString();
             rule = rephrased.get().rule;
           } else {
-            text = "I do not know how to handle '" + sentence.text() + "'";
+            text = "I do not know how to handle '" + sentence + "'";
             rule = "CANONICAL_IDK";
+            unhandled++;
           }
-          String[] row = {rule, sentence.text(), text};
+          ruleCounter.incrementCount(rule);
+          String[] row = {sentence, text, rule};
           writer.writeNext(row);
           count += 1;
         }
+        System.out.println("Unhandled: " + unhandled + "/" + count + "=" + ((double) unhandled/count));
+        System.out.println(ruleCounter.toString(NumberFormat.getInstance()));
       }
     }
+    System.out.println(dateFormat.format(new Date()));
   }
 }
