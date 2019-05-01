@@ -3,7 +3,6 @@ package ai.eloquent.rephrasing.scripts.idk;
 import ai.eloquent.rephrasing.RuleBasedIDKRephraser;
 import au.com.bytecode.opencsv.CSVReader;
 import au.com.bytecode.opencsv.CSVWriter;
-import edu.stanford.nlp.simple.Sentence;
 import edu.stanford.nlp.stats.IntCounter;
 import edu.stanford.nlp.util.ArgumentParser;
 
@@ -51,7 +50,7 @@ public class TestRuleBased {
     System.out.println(dateFormat.format(new Date()));
     ArgumentParser.fillOptions(TestRuleBased.class, args);
     List<String> sentences = readSentences();
-    RuleBasedIDKRephraser rephraser = new RuleBasedIDKRephraser();
+    RuleBasedIDKRephraser rephraser = new RuleBasedIDKRephraser(true);
     if (outFile == null) {
       for (String sentence : sentences) {
         Optional<String> rephrased = rephraser.rephrased(sentence);

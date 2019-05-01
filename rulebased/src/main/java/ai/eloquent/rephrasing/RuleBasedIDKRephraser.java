@@ -12,12 +12,24 @@ import edu.stanford.nlp.semgraph.semgrex.SemgrexPattern;
 import edu.stanford.nlp.simple.Document;
 import edu.stanford.nlp.simple.Sentence;
 import edu.stanford.nlp.trees.GrammaticalRelation;
+import edu.stanford.nlp.util.ArraySet;
+import edu.stanford.nlp.util.Generics;
 import edu.stanford.nlp.util.Pair;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class RuleBasedIDKRephraser extends RuleBasedRephraser {
+
+  boolean useWhitespaceTokenizer = false;
+
+  public RuleBasedIDKRephraser() {
+  }
+
+  public RuleBasedIDKRephraser(boolean useWhitespaceTokenizer) {
+    this.useWhitespaceTokenizer = useWhitespaceTokenizer;
+  }
 
   public Optional<String> rephrased(Sentence request) {
     Optional<Rephrased> rephrased = rephrasedWithRule(request);
@@ -31,7 +43,11 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
   public Optional<Rephrased> rephrasedWithRule(String request) {
     Annotation ann = new Annotation(request);
-    TOKENIZE_WS_SSPLIT.get().annotate(ann);
+    if (useWhitespaceTokenizer) {
+      TOKENIZE_WS_SSPLIT.get().annotate(ann);
+    } else {
+      TOKENIZE_PTB_SSPLIT.get().annotate(ann);
+    }
     Document doc = new Document(ann);
     return selectOneRephrasedWithRule(doc.sentences());
   }
@@ -50,7 +66,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
   public Optional<Rephrased> rephrasedWithRule(Sentence request) {
     //Preprocess the sentence by switching the point of view of pronouns i.e. I to you
-    request.lemmas(); // Make sure we have lemmas
+    request = removeUselessWords(request);
     Sentence simplifiedRequest = simplify(request);
     Optional<Rephrased> rephrased = rephraseQuestion(simplifiedRequest, request);
     if (rephrased.isPresent()) {
@@ -99,16 +115,28 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
   }
 
 
+  private Sentence removeUselessWords(Sentence sentence) {
+//    if (words.size() > 1 && words.get(0).equalsIgnoreCase("please")) {
+//      // Drop please
+//      sentence = new Sentence(words.subList(1, words.size()));
+//      words = sentence.words();
+//    }
+    // Drop please
+    List<String> words = sentence.originalTexts();
+    words = words.stream().filter(x -> !x.equalsIgnoreCase("please")).collect(Collectors.toList());
+    if (words.size() > 0) {
+      sentence = new Sentence(words);
+      sentence.lemmas(); // Make sure we have lemmas
+    }
+    return sentence;
+  }
+
+
   // Patterns at beginning of sentences indicating need or want: I need, I want, I would like
-  TokenSequencePattern needPattern = TokenSequencePattern.compile("[lemma:I] [lemma:would]? [lemma:/need|want|like/] [lemma:to]?");
+  TokenSequencePattern needPattern = TokenSequencePattern.compile("[lemma:I] [lemma:would]? [pos:JJ]? [lemma:/need|want|like/] [lemma:to]?");
 //  TokenSequencePattern needPattern = TokenSequencePattern.compile("/I/ /need/");
   private Sentence simplify(Sentence sentence) {
-    List<String> words = sentence.words();
-    if (words.size() > 1 && words.get(0).equalsIgnoreCase("please")) {
-      // Drop please
-      sentence = new Sentence(words.subList(1, words.size()));
-      words = sentence.words();
-    }
+    List<String> words = sentence.originalTexts();
 
     // Remove "I need"
     List<Pair<Integer,Integer>> matchedOffsets = sentence.find(needPattern, m -> Pair.makePair(m.start(), m.end()));
@@ -125,6 +153,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
       }
       if (newWords.size() > 0) {
         sentence = new Sentence(newWords);
+        sentence.lemmas(); // Make sure we have lemmas
       }
     }
     sentence = removeAuxilliaryDo(sentence);
@@ -189,8 +218,92 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
         }
         dependencyGraph.removeVertex(v2);
         sentence = new Sentence(dependencyGraph.toRecoveredSentenceString());
+        sentence.lemmas(); // Make sure we have lemmas
       }
     }
+    return sentence;
+  }
+
+  /**
+   * Returns all nodes reachable from {@code root}.
+   *
+   * @param root the root node of the subgraph
+   * @return all nodes in subgraph
+   */
+  public Set<IndexedWord> getFilteredSubgraphVertices(SemanticGraph graph, IndexedWord root,
+                                                      Predicate<Pair<IndexedWord,IndexedWord>> keepChild) {
+    Set<IndexedWord> result = Collections.newSetFromMap(new IdentityHashMap<>());
+    result.add(root);
+    List<IndexedWord> queue = Generics.newLinkedList();
+    queue.add(root);
+    while (! queue.isEmpty()) {
+      IndexedWord current = queue.remove(0);
+      for (IndexedWord child : graph.getChildren(current)) {
+        if (! result.contains(child) && keepChild.test(Pair.makePair(child, current))) {
+          result.add(child);
+          queue.add(child);
+        }
+      }
+    }
+    return result;
+  }
+
+  private Sentence reorderSentence(Sentence sentence, int auxVerbIndex, int startIndex) {
+    SemanticGraph dependencyGraph = sentence.dependencyGraph();
+    //SemanticGraph dependencyGraph = new SemanticGraph(sentence.dependencyGraph());
+    List<IndexedWord> nodes = dependencyGraph.vertexListSorted();
+    IndexedWord v = nodes.get(auxVerbIndex);
+    IndexedWord t = nodes.get(startIndex);
+
+    IndexedWord lastHead = nodes.get(nodes.size()-1);
+
+    List<IndexedWord> path = dependencyGraph.getShortestUndirectedPathNodes(t, v);
+    IndexedWord head = t;
+    Set<String> stopEdges = new ArraySet<>("nsubj", "nsubjpass", "advmod");
+    for (int i = 0; i < path.size()-1; i++) {
+      IndexedWord n1 = path.get(i);
+      IndexedWord n2 = path.get(i+1);
+      SemanticGraphEdge edge = dependencyGraph.getEdge(n2, n1);
+      if (edge == null || stopEdges.contains(edge.getRelation().getShortName().toLowerCase())) {
+        head = n1;
+        break;
+      } else if (lastHead == n2) {
+        head = n1;
+        break;
+      }
+    }
+
+//    Set<IndexedWord> sub = dependencyGraph.getSubgraphVertices(head);'
+    Set<String> ignoreEdges = new ArraySet<>("acl", "amod", "nmod");
+    Set<IndexedWord> sub = getFilteredSubgraphVertices(dependencyGraph, head, p -> {
+      IndexedWord child = p.first;
+      IndexedWord parent = p.second;
+      SemanticGraphEdge edge = dependencyGraph.getEdge(parent, child);
+      String label = edge.getRelation().getShortName().toLowerCase();
+      if (ignoreEdges.contains(label) || label.startsWith("acl")) {
+        return false;
+      } else {
+        return true;
+      }
+    });
+
+//    Set<IndexedWord> ignoreNodes = dependencyGraph.getSubgraphVertices(lastHead);
+
+    int maxIndex = -1;
+    for (IndexedWord w : sub) {
+      if (w.index() > maxIndex) {
+        maxIndex = w.index();
+      }
+    }
+    if (maxIndex == nodes.size()) {
+      maxIndex = 2;
+    }
+    List<String> tokens = sentence.originalTexts();
+    List<String> rearranged = new ArrayList<>(tokens.subList(1, maxIndex));
+    rearranged.add(tokens.get(0).toLowerCase());
+    rearranged.addAll(tokens.subList(maxIndex, tokens.size()));
+    sentence = new Sentence(rearranged);
+    sentence.lemmas(); // Make sure we have lemmas
     return sentence;
   }
 
@@ -198,14 +311,9 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     //Get graph for semgrex searches
     SemanticGraph dependencyGraph = sentence.dependencyGraph();
 
-    //Check for imperative sentence (no subject, no W pos, no question mark)
     SemgrexPattern subjPattern = SemgrexPattern.compile("{} >nsubj {}");
     SemgrexPattern wPattern = SemgrexPattern.compile("{pos:/W.*/}");
     SemgrexPattern qPuncPattern = SemgrexPattern.compile("{word:/\\?/}");
-    // Handles sentences like "Help me"
-    if (!subjPattern.matcher(dependencyGraph).find() && !wPattern.matcher(dependencyGraph).find() && !qPuncPattern.matcher(dependencyGraph).find()) {
-      return Optional.of(new Rephrased("I do not know how to", sentence, "IMPERATIVE"));
-    }
 
     //Check for easy question to switch around the phrasing
     SemanticGraph copyDepGraph = new SemanticGraph(dependencyGraph);
@@ -305,7 +413,12 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     if ((originalSentence.lemma(0).equalsIgnoreCase("do") ||
          originalSentence.lemma(0).equalsIgnoreCase("does")) // sometimes does is identified as NNS
              && originalSentence.length() > 1) {
-      return Optional.of(new Rephrased("I do not know if", sentence, "DO_QUESTION"));
+      if (sentence.length() < originalSentence.length()) {
+        return Optional.of(new Rephrased("I do not know if", sentence, "DO_QUESTION"));
+      } else {
+        List<String> words = originalSentence.originalTexts();
+        return Optional.of(new Rephrased("I do not know if", new Sentence(words.subList(1, words.size())), "DO_QUESTION"));
+      }
     }
 
     //If it is a "Is <word>" or "Are <word>" or "Have <word>" question then flip and output "if <word> is/are ..."
@@ -313,17 +426,31 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     if ((sentence.lemma(0).equalsIgnoreCase("be") ||
          sentence.lemma(0).equalsIgnoreCase("have") ||
          sentence.posTag(0).equals("MD")) && sentence.length() > 1 ) {
-      List<String> tokens = sentence.originalTexts();
-      List<String> rearranged = new ArrayList<>(tokens);
-      rearranged.set(0, tokens.get(1));
-      rearranged.set(1, tokens.get(0).toLowerCase());
-      return Optional.of(new Rephrased("I do not know if", new Sentence(rearranged), "BE_HAVE_MD_QUESTION"));
+      if (!sentence.posTag(1).startsWith("V")) {
+        Sentence rearranged = reorderSentence(sentence, 0, 1);
+        return Optional.of(new Rephrased("I do not know if", rearranged, "BE_HAVE_MD_QUESTION"));
+      }
+    }
+
+    if ((originalSentence.lemma(0).equalsIgnoreCase("be") ||
+            originalSentence.lemma(0).equalsIgnoreCase("have") ||
+            originalSentence.posTag(0).equals("MD")) && sentence.length() > 1 ) {
+      if (!originalSentence.posTag(1).startsWith("V")) {
+        Sentence rearranged = reorderSentence(originalSentence, 0, 1);
+        return Optional.of(new Rephrased("I do not know if", rearranged, "BE_HAVE_MD_QUESTION2"));
+      }
     }
 
     //If it is a "Why ..." question then output "I don't know ..."
     if (sentence.length() > 1 &&
-        (sentence.posTag(0).startsWith("W"))) {
-      return Optional.of(new Rephrased("I do not know ", sentence, "WQUES_SIMPLE"));
+            (sentence.posTag(0).startsWith("W"))) {
+      return Optional.of(new Rephrased("I do not know", sentence, "WQUES_SIMPLE"));
+    }
+
+    //Check for imperative sentence (no subject, no W pos, no question mark)
+    // Handles sentences like "Help me"
+    if (!subjPattern.matcher(dependencyGraph).find() && !wPattern.matcher(dependencyGraph).find() && !qPuncPattern.matcher(dependencyGraph).find()) {
+      return Optional.of(new Rephrased("I do not know how to", sentence, "IMPERATIVE"));
     }
 
     // Worst Case Scenario
