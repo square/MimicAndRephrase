@@ -5,10 +5,8 @@ import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.ling.tokensregex.TokenSequencePattern;
 import edu.stanford.nlp.naturalli.VerbTense;
 import edu.stanford.nlp.pipeline.Annotation;
-import edu.stanford.nlp.pipeline.CoreNLPProtos;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
-import edu.stanford.nlp.semgraph.SemanticGraphFactory;
 import edu.stanford.nlp.semgraph.SemanticGraphUtils;
 import edu.stanford.nlp.semgraph.semgrex.SemgrexMatcher;
 import edu.stanford.nlp.semgraph.semgrex.SemgrexPattern;
@@ -333,6 +331,38 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     //Get graph for semgrex searches
     SemanticGraph dependencyGraph = sentence.dependencyGraph();
 
+    //If it is a "Do ..." or "Does ..." question then output "I do not know if ..."
+    if ((originalSentence.lemma(0).equalsIgnoreCase("do") ||
+            originalSentence.lemma(0).equalsIgnoreCase("does")) // sometimes does is identified as NNS
+            && originalSentence.length() > 1) {
+      if (sentence.length() < originalSentence.length()) {
+        return Optional.of(new Rephrased("I do not know if", sentence, "DO_QUESTION"));
+      } else {
+        List<String> words = originalSentence.originalTexts();
+        return Optional.of(new Rephrased("I do not know if", new Sentence(words.subList(1, words.size())), "DO_QUESTION"));
+      }
+    }
+
+    //If it is a "Is <word>" or "Are <word>" or "Have <word>" question then flip and output "if <word> is/are ..."
+    //If it is a "Can|Could|Would|May|Will <word>" question do the same
+    if ((sentence.lemma(0).equalsIgnoreCase("be") ||
+            sentence.lemma(0).equalsIgnoreCase("have") ||
+            sentence.posTag(0).equals("MD")) && sentence.length() > 1 ) {
+      if (!sentence.posTag(1).startsWith("V")) {
+        Sentence rearranged = reorderSentence(sentence, 0, 1);
+        return Optional.of(new Rephrased("I do not know if", rearranged, "BE_HAVE_MD_QUESTION"));
+      }
+    }
+
+    if ((originalSentence.lemma(0).equalsIgnoreCase("be") ||
+            originalSentence.lemma(0).equalsIgnoreCase("have") ||
+            originalSentence.posTag(0).equals("MD")) && sentence.length() > 1 ) {
+      if (!originalSentence.posTag(1).startsWith("V")) {
+        Sentence rearranged = reorderSentence(originalSentence, 0, 1);
+        return Optional.of(new Rephrased("I do not know if", rearranged, "BE_HAVE_MD_QUESTION2"));
+      }
+    }
+
     SemgrexPattern subjPattern = SemgrexPattern.compile("{} >nsubj {}");
     SemgrexPattern wPattern = SemgrexPattern.compile("{pos:/W.*/}");
     SemgrexPattern qPuncPattern = SemgrexPattern.compile("{word:/\\?/}");
@@ -429,38 +459,6 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     SemgrexMatcher whoSubjMatcher = whoSubjPattern.matcher(dependencyGraph);
     if (whoSubjMatcher.find()) {
       return Optional.of(new Rephrased("I do not know", sentence, "WSUBJ"));
-    }
-
-    //If it is a "Do ..." or "Does ..." question then output "I do not know if ..."
-    if ((originalSentence.lemma(0).equalsIgnoreCase("do") ||
-         originalSentence.lemma(0).equalsIgnoreCase("does")) // sometimes does is identified as NNS
-             && originalSentence.length() > 1) {
-      if (sentence.length() < originalSentence.length()) {
-        return Optional.of(new Rephrased("I do not know if", sentence, "DO_QUESTION"));
-      } else {
-        List<String> words = originalSentence.originalTexts();
-        return Optional.of(new Rephrased("I do not know if", new Sentence(words.subList(1, words.size())), "DO_QUESTION"));
-      }
-    }
-
-    //If it is a "Is <word>" or "Are <word>" or "Have <word>" question then flip and output "if <word> is/are ..."
-    //If it is a "Can|Could|Would|May|Will <word>" question do the same
-    if ((sentence.lemma(0).equalsIgnoreCase("be") ||
-         sentence.lemma(0).equalsIgnoreCase("have") ||
-         sentence.posTag(0).equals("MD")) && sentence.length() > 1 ) {
-      if (!sentence.posTag(1).startsWith("V")) {
-        Sentence rearranged = reorderSentence(sentence, 0, 1);
-        return Optional.of(new Rephrased("I do not know if", rearranged, "BE_HAVE_MD_QUESTION"));
-      }
-    }
-
-    if ((originalSentence.lemma(0).equalsIgnoreCase("be") ||
-            originalSentence.lemma(0).equalsIgnoreCase("have") ||
-            originalSentence.posTag(0).equals("MD")) && sentence.length() > 1 ) {
-      if (!originalSentence.posTag(1).startsWith("V")) {
-        Sentence rearranged = reorderSentence(originalSentence, 0, 1);
-        return Optional.of(new Rephrased("I do not know if", rearranged, "BE_HAVE_MD_QUESTION2"));
-      }
     }
 
     //If it is a "Why ..." question then output "I don't know ..."
