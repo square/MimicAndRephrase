@@ -5,8 +5,11 @@ import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.ling.tokensregex.TokenSequencePattern;
 import edu.stanford.nlp.naturalli.VerbTense;
 import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.pipeline.CoreNLPProtos;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
+import edu.stanford.nlp.semgraph.SemanticGraphFactory;
+import edu.stanford.nlp.semgraph.SemanticGraphUtils;
 import edu.stanford.nlp.semgraph.semgrex.SemgrexMatcher;
 import edu.stanford.nlp.semgraph.semgrex.SemgrexPattern;
 import edu.stanford.nlp.simple.Document;
@@ -66,9 +69,8 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
   public Optional<Rephrased> rephrasedWithRule(Sentence request) {
     //Preprocess the sentence by switching the point of view of pronouns i.e. I to you
-    request = removeUselessWords(request);
     Sentence simplifiedRequest = simplify(request);
-    Optional<Rephrased> rephrased = rephraseQuestion(simplifiedRequest, request);
+    Optional<Rephrased> rephrased = rephraseQuestion(simplifiedRequest);
     if (rephrased.isPresent()) {
       //Make sure not upper cased
       rephrased.get().sentence = rephrased
@@ -116,11 +118,6 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
 
   private Sentence removeUselessWords(Sentence sentence) {
-//    if (words.size() > 1 && words.get(0).equalsIgnoreCase("please")) {
-//      // Drop please
-//      sentence = new Sentence(words.subList(1, words.size()));
-//      words = sentence.words();
-//    }
     // Drop please
     List<String> words = sentence.originalTexts();
     words = words.stream().filter(x -> !x.equalsIgnoreCase("please")).collect(Collectors.toList());
@@ -131,12 +128,33 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     return sentence;
   }
 
+  private static SemgrexPattern advclPattern = SemgrexPattern.compile("{pos:/V.*/}=v1 >/acl:relcl|advcl:if/ {pos:/V.*/}=v2");
+  private Sentence removeAdvcl(Sentence sentence) {
+    SemanticGraph depGraph = sentence.dependencyGraph();
+    SemgrexMatcher advclPatternMatcher = advclPattern.matcher(depGraph);
+    if (advclPatternMatcher.find()) {
+      IndexedWord v2 = advclPatternMatcher.getNode("v2");
+      //System.out.println("Rewriting " + sentence);
+      depGraph.removeVertex(v2);
+      SemanticGraphUtils.killNonRooted(depGraph);
+      IndexedWord word = depGraph.vertexListSorted().get(0);
+      if (PUNCT_POS.contains(word.tag())) {
+        depGraph.removeVertex(word);
+      }
+      sentence = new Sentence(depGraph.toRecoveredSentenceString());
+      sentence.lemmas();
+      //System.out.println("  to " + sentence);
+    }
+    return sentence;
+  }
+
 
   // Patterns at beginning of sentences indicating need or want: I need, I want, I would like
   TokenSequencePattern needPattern = TokenSequencePattern.compile("[lemma:I] [lemma:would]? [pos:JJ]? [lemma:/need|want|like/] [lemma:to]?");
 //  TokenSequencePattern needPattern = TokenSequencePattern.compile("/I/ /need/");
   private Sentence simplify(Sentence sentence) {
     List<String> words = sentence.originalTexts();
+    sentence = removeUselessWords(sentence);
 
     // Remove "I need"
     List<Pair<Integer,Integer>> matchedOffsets = sentence.find(needPattern, m -> Pair.makePair(m.start(), m.end()));
@@ -156,7 +174,6 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
         sentence.lemmas(); // Make sure we have lemmas
       }
     }
-    sentence = removeAuxilliaryDo(sentence);
     return sentence;
   }
 
@@ -194,12 +211,12 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     }
   }
 
+  private static SemgrexPattern auxPattern = SemgrexPattern.compile("{pos:/V.*/}=v1 >aux {pos:/V.*/}=v2");
   private Sentence removeAuxilliaryDo(Sentence sentence) {
     SemanticGraph dependencyGraph = sentence.dependencyGraph();
     // Simplify sentences like "Why do you sell socks?" to "Why you sell socks"
     // Simplify sentences like "Why did you sell socks?" to "Why you sold socks"
     // Simplify sentences like "Do you sell socks?" to "You sell socks?"
-    SemgrexPattern auxPattern = SemgrexPattern.compile("{pos:/V.*/}=v1 >aux {pos:/V.*/}=v2");
     SemgrexMatcher auxPatternMatcher = auxPattern.matcher(dependencyGraph);
     if (auxPatternMatcher.find()) {
       IndexedWord v1 = auxPatternMatcher.getNode("v1");
@@ -220,6 +237,9 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
         sentence = new Sentence(dependencyGraph.toRecoveredSentenceString());
         sentence.lemmas(); // Make sure we have lemmas
       }
+    }
+    if (sentence.lemmas().get(0).equalsIgnoreCase("if")) {
+      sentence = removeAdvcl(sentence);
     }
     return sentence;
   }
@@ -307,7 +327,9 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     return sentence;
   }
 
-  private Optional<Rephrased> rephraseQuestion(Sentence sentence, Sentence originalSentence) {
+  private Optional<Rephrased> rephraseQuestion(Sentence originalSentence) {
+    Sentence sentence = removeAuxilliaryDo(originalSentence);
+
     //Get graph for semgrex searches
     SemanticGraph dependencyGraph = sentence.dependencyGraph();
 
