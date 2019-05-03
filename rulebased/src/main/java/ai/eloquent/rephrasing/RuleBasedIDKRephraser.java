@@ -12,6 +12,7 @@ import edu.stanford.nlp.semgraph.semgrex.SemgrexMatcher;
 import edu.stanford.nlp.semgraph.semgrex.SemgrexPattern;
 import edu.stanford.nlp.simple.Document;
 import edu.stanford.nlp.simple.Sentence;
+import edu.stanford.nlp.simple.Token;
 import edu.stanford.nlp.trees.GrammaticalRelation;
 import edu.stanford.nlp.util.ArraySet;
 import edu.stanford.nlp.util.Generics;
@@ -120,6 +121,12 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     List<String> words = sentence.originalTexts();
     words = words.stream().filter(x -> !x.equalsIgnoreCase("please")).collect(Collectors.toList());
     if (words.size() > 0) {
+      if (words.size() > 1 && words.get(0).equalsIgnoreCase(",")) {
+        words = words.subList(1, words.size());
+      }
+      if (words.size() > 1 && words.get(words.size()-1).equalsIgnoreCase(",")) {
+        words = words.subList(0, words.size()-1);
+      }
       sentence = new Sentence(words);
       sentence.lemmas(); // Make sure we have lemmas
     }
@@ -148,14 +155,38 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
 
 
   // Patterns at beginning of sentences indicating need or want: I need, I want, I would like
+  TokenSequencePattern wantPattern = TokenSequencePattern.compile("[lemma:I] [lemma:would]? [lemma:/need|want|like/] [lemma:to] [lemma:know]");
+
+  // Patterns at beginning of sentences indicating need or want: I need, I want, I would like
   TokenSequencePattern needPattern = TokenSequencePattern.compile("[lemma:I] [lemma:would]? [pos:JJ]? [lemma:/need|want|like/] [lemma:to]?");
-//  TokenSequencePattern needPattern = TokenSequencePattern.compile("/I/ /need/");
   private Sentence simplify(Sentence sentence) {
-    List<String> words = sentence.originalTexts();
     sentence = removeUselessWords(sentence);
 
+    Sentence sentence1 = removePattern(sentence, wantPattern);
+    if (sentence1 != sentence) {
+      SemanticGraph depGraph = sentence1.dependencyGraph();
+      Collection<IndexedWord> roots = depGraph.getRoots();
+      Token firstToken = sentence1.tokens().get(0);
+      if (firstToken.lemma().equalsIgnoreCase("if") ||
+              firstToken.lemma().equalsIgnoreCase("be") ||
+              firstToken.lemma().equalsIgnoreCase("have") ||
+              firstToken.posTag().startsWith("W") ||
+              firstToken.posTag().equalsIgnoreCase("MD")) {
+        sentence = sentence1;
+      } else if (roots.stream().allMatch(r -> r.tag().startsWith("N"))) {
+        sentence = new Sentence("what is " + sentence1.toString());
+      } else {
+        sentence = sentence1;
+      }
+    }
+    sentence = removePattern(sentence, needPattern);
+    return sentence;
+  }
+
+  private Sentence removePattern(Sentence sentence, TokenSequencePattern pattern) {
     // Remove "I need"
-    List<Pair<Integer,Integer>> matchedOffsets = sentence.find(needPattern, m -> Pair.makePair(m.start(), m.end()));
+    List<String> words = sentence.originalTexts();
+    List<Pair<Integer,Integer>> matchedOffsets = sentence.find(pattern, m -> Pair.makePair(m.start(), m.end()));
     matchedOffsets = matchedOffsets.stream().filter(x -> x.first == 0).collect(Collectors.toList());
     if (matchedOffsets.size() > 0) {
       List<String> newWords = new ArrayList<>();
@@ -171,6 +202,14 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
         sentence = new Sentence(newWords);
         sentence.lemmas(); // Make sure we have lemmas
       }
+    }
+    return sentence;
+  }
+
+  private Sentence removeAuxilliaryClauses(Sentence sentence){
+    sentence = removeAuxilliaryDo(sentence);
+    if (sentence.lemmas().get(0).equalsIgnoreCase("if")) {
+      sentence = removeAdvcl(sentence);
     }
     return sentence;
   }
@@ -236,9 +275,6 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
         sentence.lemmas(); // Make sure we have lemmas
       }
     }
-    if (sentence.lemmas().get(0).equalsIgnoreCase("if")) {
-      sentence = removeAdvcl(sentence);
-    }
     return sentence;
   }
 
@@ -292,6 +328,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
     }
 
 //    Set<IndexedWord> sub = dependencyGraph.getSubgraphVertices(head);'
+    // Note: doesn't handle (anyone else, anyone other than me)
     Set<String> ignoreEdges = new ArraySet<>("acl", "amod", "nmod");
     Set<IndexedWord> sub = getFilteredSubgraphVertices(dependencyGraph, head, p -> {
       IndexedWord child = p.first;
@@ -326,7 +363,7 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
   }
 
   private Optional<Rephrased> rephraseQuestion(Sentence originalSentence) {
-    Sentence sentence = removeAuxilliaryDo(originalSentence);
+    Sentence sentence = removeAuxilliaryClauses(originalSentence);
 
     //Get graph for semgrex searches
     SemanticGraph dependencyGraph = sentence.dependencyGraph();
@@ -361,6 +398,13 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
         Sentence rearranged = reorderSentence(originalSentence, 0, 1);
         return Optional.of(new Rephrased("I do not know if", rearranged, "BE_HAVE_MD_QUESTION2"));
       }
+    }
+
+    //If the W POS word is the subject it seems safe to not alter the order of the words.
+    SemgrexPattern whoSubjPattern = SemgrexPattern.compile("{} >nsubj {pos:/W.*/}");
+    SemgrexMatcher whoSubjMatcher = whoSubjPattern.matcher(dependencyGraph);
+    if (whoSubjMatcher.find()) {
+      return Optional.of(new Rephrased("I do not know", sentence, "WSUBJ"));
     }
 
     SemgrexPattern subjPattern = SemgrexPattern.compile("{} >nsubj {}");
@@ -452,13 +496,6 @@ public class RuleBasedIDKRephraser extends RuleBasedRephraser {
         words.add(remainingWord.word());
       }
       return Optional.of(new Rephrased("I do not know", new Sentence(words), "WQUES"));
-    }
-
-    //If the W POS word is the subject it seems safe to not alter the order of the words.
-    SemgrexPattern whoSubjPattern = SemgrexPattern.compile("{} >nsubj {pos:/W.*/}");
-    SemgrexMatcher whoSubjMatcher = whoSubjPattern.matcher(dependencyGraph);
-    if (whoSubjMatcher.find()) {
-      return Optional.of(new Rephrased("I do not know", sentence, "WSUBJ"));
     }
 
     //If it is a "Why ..." question then output "I don't know ..."
