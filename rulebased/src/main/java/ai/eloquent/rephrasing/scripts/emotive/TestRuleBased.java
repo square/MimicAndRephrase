@@ -28,6 +28,8 @@ public class TestRuleBased {
           required = false)
   public static long seed = 47127099;
 
+  public static boolean defaultIsCondensed = false;
+
   static class SentimentSentence {
     Sentence sentence;
     RuleBasedEmotiveRephraser.Sentiment sentiment;
@@ -49,7 +51,7 @@ public class TestRuleBased {
         if (row.length > 0) {
           RuleBasedEmotiveRephraser.Sentiment sentiment = "pos".equals(row[2])?
                   RuleBasedEmotiveRephraser.Sentiment.Positive : RuleBasedEmotiveRephraser.Sentiment.Negative;
-          boolean isCondensed = "condensed".equals(row[3]);
+          boolean isCondensed = (row.length > 3)? "condensed".equals(row[3]) : TestRuleBased.defaultIsCondensed;
           sentences.add(
                   new SentimentSentence(new Sentence(row[0]), sentiment, isCondensed));
         }

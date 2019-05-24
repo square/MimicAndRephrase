@@ -196,8 +196,12 @@ public class RuleBasedRephraser {
                 endIndex--;
             }
             words = words.subList(startIndex, endIndex);
-            System.out.println(words);
-            return new Sentence(words.stream().map( x -> x.word()).collect(Collectors.toList()));
+            //System.out.println(words);
+            if (words.size() > 0) {
+                return new Sentence(words.stream().map(x -> x.word()).collect(Collectors.toList()));
+            } else {
+                return sentence;
+            }
         }
         return null;
     }
