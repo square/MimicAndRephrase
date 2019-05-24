@@ -17,11 +17,11 @@ import java.util.Optional;
 
 public class TestRuleBased {
 
-  @ArgumentParser.Option(name = "in", gloss = "The input dataset file. This should be a csv file",
+  @ArgumentParser.Option(name = "in", gloss = "The input dataset file. This should be a tsv file",
       required = true)
   public static File tsvFile;
 
-  @ArgumentParser.Option(name = "out", gloss = "The input dataset file. This should be a csv file",
+  @ArgumentParser.Option(name = "out", gloss = "The input dataset file. This should be a tsv file",
       required = false)
   public static File outFile;
 
